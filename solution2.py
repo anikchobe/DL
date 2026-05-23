@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from solution2_viz import show_training_report
+
 
 @dataclass(frozen=True)
 class RegressionStep:
@@ -63,3 +65,8 @@ print(f'w = {learned_w}, b = {learned_b}')
 print("step | weight     | bias | loss       ")
 for item in history:
     print(f"{item.step:>4} | {item.weight:>10.6f} | {item.bias:>10.6f} | {item.loss:>10.6f}")
+
+# The same run as a picture.  All of the matplotlib code lives in
+# solution2_viz.py; it only needs the four functions above.
+figure_path = show_training_report(x, y, forward, mean_half_squared_error, loss_and_gradients, train)
+print(f"\nSaved the training graphs to {figure_path}")

@@ -13,24 +13,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-import matplotlib
 import matplotlib.pyplot as plt
+
+from viz_style import (
+    AQUA, AXIS, BLUE, BLUE_RAMP_4, INK, MUTED, ORANGE, SURFACE,
+    draw_line, finish, legend, note, style_axes,
+)
 
 # One colour, one meaning, in every panel: blue is the loss, orange is the
 # weight, aqua is the prediction.
-LOSS_COLOR = "#2a78d6"
-WEIGHT_COLOR = "#eb6834"
-PREDICTION_COLOR = "#1baf7a"
+LOSS_COLOR = BLUE
+WEIGHT_COLOR = ORANGE
+PREDICTION_COLOR = AQUA
 
 # Learning rates are *ordered*, so they get one hue from light to dark instead
 # of four unrelated colours: darker means a bigger step.
-LEARNING_RATE_COLORS = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]
-
-SURFACE = "#fcfcfb"  # paper behind the plots
-INK = "#0b0b0b"      # titles
-MUTED = "#898781"    # axis labels, reference lines, notes
-GRID = "#e1e0d9"     # hairline gridlines
-AXIS = "#c3c2b7"     # the zero rule
+LEARNING_RATE_COLORS = BLUE_RAMP_4
 
 
 @dataclass(frozen=True)
@@ -42,31 +40,6 @@ class Run:
     predictions: list[float]
     losses: list[float]
     gradients: list[float]
-
-
-def style_axes(axes, title: str, xlabel: str, ylabel: str) -> None:
-    """Recessive chrome, so the data is the loudest thing on the panel."""
-    axes.set_title(title, color=INK, fontsize=11, fontweight="bold", loc="left", pad=10)
-    axes.set_xlabel(xlabel, color=MUTED, fontsize=9)
-    axes.set_ylabel(ylabel, color=MUTED, fontsize=9)
-    axes.set_facecolor(SURFACE)
-    axes.grid(True, color=GRID, linewidth=0.8)
-    axes.set_axisbelow(True)
-    axes.tick_params(colors=MUTED, labelsize=8, length=0)
-    for side, spine in axes.spines.items():
-        spine.set_visible(side == "bottom")
-        spine.set_color(AXIS)
-        spine.set_linewidth(1)
-
-
-def draw_line(axes, xs, ys, color, label=None, marker="o"):
-    """A thin line whose markers are ringed in the paper colour, so they never merge."""
-    return axes.plot(
-        xs, ys,
-        color=color, linewidth=2, label=label,
-        marker=marker, markersize=4.5,
-        markerfacecolor=color, markeredgecolor=SURFACE, markeredgewidth=1.5,
-    )
 
 
 def plot_loss(axes, run: Run) -> None:
@@ -92,12 +65,11 @@ def plot_loss_log(axes, run: Run) -> None:
     axes.set_yscale("log")
     style_axes(axes, "2 · The same loss, log axis", "training step", "loss (log scale)")
     shrink = run.losses[1] / run.losses[0]
-    axes.annotate(
-        "a straight line here means the loss shrinks by the\n"
-        f"same factor ({shrink:.2f}x) every step.  Panel 1 flattens\n"
-        "out; it is not stalling, it is running out of room.",
-        xy=(0.04, 0.06), xycoords="axes fraction", color=MUTED, fontsize=8.5,
-    )
+    note(axes,
+         "a straight line here means the loss shrinks by the\n"
+         f"same factor ({shrink:.2f}x) every step.  Panel 1 flattens\n"
+         "out; it is not stalling, it is running out of room.",
+         0.04, 0.06)
 
 
 def plot_loss_landscape(
@@ -123,7 +95,7 @@ def plot_loss_landscape(
         xy=(run.weights[0], run.losses[0]), xytext=(40, 16),
         textcoords="offset points", color=WEIGHT_COLOR, fontsize=8.5,
     )
-    axes.legend(frameon=False, fontsize=8.5, labelcolor=MUTED, loc="upper right")
+    legend(axes, "upper right")
 
 
 def plot_convergence(axes, run: Run, best_weight: float, target: float) -> None:
@@ -145,7 +117,7 @@ def plot_convergence(axes, run: Run, best_weight: float, target: float) -> None:
             textcoords="offset points", color=color, fontsize=8.5, ha="right",
         )
     style_axes(axes, "4 · Weight and prediction reach their targets", "training step", "value")
-    axes.legend(frameon=False, fontsize=8.5, labelcolor=MUTED, loc="center right")
+    legend(axes, "center right")
 
 
 def plot_gradient(axes, run: Run) -> None:
@@ -153,13 +125,12 @@ def plot_gradient(axes, run: Run) -> None:
     axes.bar(run.steps, run.gradients, color=LOSS_COLOR, width=0.6)
     axes.axhline(0, color=AXIS, linewidth=1)
     style_axes(axes, "5 · The gradient fades to zero", "training step", "gradient")
-    axes.annotate(
-        f"the gradient is negative ({run.gradients[0]:.0f} at the start), and\n"
-        "`weight -= learning_rate * gradient` subtracts a negative,\n"
-        "so the weight goes up.  Near the bottom of the bowl the\n"
-        "gradient is tiny, so nobody has to tell the steps to shrink.",
-        xy=(0.97, 0.06), xycoords="axes fraction", color=MUTED, fontsize=8.5, ha="right",
-    )
+    note(axes,
+         f"the gradient is negative ({run.gradients[0]:.0f} at the start), and\n"
+         "`weight -= learning_rate * gradient` subtracts a negative,\n"
+         "so the weight goes up.  Near the bottom of the bowl the\n"
+         "gradient is tiny, so nobody has to tell the steps to shrink.",
+         0.97, 0.06, ha="right")
 
 
 def plot_learning_rates(
@@ -181,12 +152,11 @@ def plot_learning_rates(
     # A rate of 1.0 leaves this chart on its first step, so name it rather than
     # silently drop it.
     path = " → ".join(f"{weight:g}" for weight in run_at_rate(diverging_rate).weights[:3])
-    axes.annotate(
-        f"learning rate {diverging_rate:g} diverges — one step\n"
-        f"takes it off this chart:\n{path} → …",
-        xy=(0.03, 0.97), xycoords="axes fraction", color=MUTED, fontsize=8.5, va="top",
-    )
-    axes.legend(frameon=False, fontsize=8.5, labelcolor=MUTED, loc="upper right")
+    note(axes,
+         f"learning rate {diverging_rate:g} diverges — one step\n"
+         f"takes it off this chart:\n{path} → …",
+         0.03, 0.97, va="top")
+    legend(axes, "upper right")
 
 
 def show_training_report(
@@ -235,8 +205,4 @@ def show_training_report(
     plot_learning_rates(axes[1][2], run_at_rate, best_weight)
     figure.tight_layout(rect=(0, 0, 1, 0.955))
 
-    output_path = Path(__file__).with_name("solution1_training.png")
-    figure.savefig(output_path, dpi=140, facecolor=SURFACE)
-    if matplotlib.get_backend().lower() != "agg":  # "agg" means there is no window to open
-        plt.show()
-    return output_path
+    return finish(figure, Path(__file__).with_name("solution1_training.png"))
