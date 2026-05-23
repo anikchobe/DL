@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-
+# For record keeping only.
 @dataclass(frozen=True)
 class ScalarStep:
     step: int
@@ -14,7 +14,6 @@ class ScalarStep:
 
 
 def forward(x: float, weight: float) -> float:
-    # TODO: prediction = ?
     return x * weight
 
 
@@ -22,21 +21,14 @@ def half_squared_error(prediction: float, target: float) -> float:
     # TODO: return 0.5 * error squared.
     return 0.5 * (prediction - target)**2
 
-
-def loss_at_weight(weight: float, x: float, target: float) -> float:
-    # TODO: compose forward and loss.
-    return half_squared_error(forward(x, weight), target)
-
-
-def central_difference(
-    function: Callable[[float], float], value: float, epsilon: float = 1e-5
-) -> float:
-    # TODO: evaluate function at value+epsilon and value-epsilon.
-    raise NotImplementedError
-
-
 def backward(x: float, weight: float, target: float) -> float:
     # TODO: derive d(loss)/d(weight) by the chain rule.
+    #     loss = 0.5 * (weight*x - target)²
+    #     let  e = weight*x - target       (the error)
+    #     d(loss)/d(e)      = e           (0.5*e² differentiates to e — that's the 0.5 paying off)
+    #     d(e)/d(weight)    = x           (target is a constant; weight*x differentiates to x)
+    #     chain rule — multiply them:
+    #     d(loss)/d(weight) = e * x = (prediction - target) * x
     return (forward(x, weight) - target) * x
 
 
@@ -61,6 +53,6 @@ def train_weight(
 
 learnedWeight, steps = train_weight(3, 12)
 print(learnedWeight)
-print("steps, weight, prediction, loss, gradient")
+print("step | weight     | prediction | loss       | gradient")
 for item in steps:
-    print(f"{item.step}, {item.weight}, {item.prediction}, {item.loss}, {item.gradient}")
+    print(f"{item.step:>4} | {item.weight:>10.6f} | {item.prediction:>10.6f} | {item.loss:>10.6f} | {item.gradient:>10.6f}")
