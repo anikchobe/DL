@@ -5,6 +5,21 @@ this file only reads its output.  It is kept separate so that solution2.py stays
 short enough to hold in your head.
 
 Run it with:  python3 solution2.py
+
+The graph:
+1. The mean loss falls — 11.0 → 2.4e-16.
+2. The line moves onto the data — the five points, plus the fitted line at steps 0/1/2/3/20 in one hue light→dark.
+This is the panel that makes "the model is a line" concrete.
+3. Two knobs, one bowl — stage 1's parabola becomes a contour map over (weight, bias), with the descent path and the optimum starred.
+Aspect is locked to equal, which I checked renders exactly (37.64 px per unit on both axes) — otherwise
+the panel's shape would fake the bowl's shape, and the bowl's shape is the whole point.
+4. Weight and bias find the line — landing on 3.000 and 2.000.
+5. Every example votes — per-example bars of error and error × x, with dashed lines at their means, which are the two gradients (−2 and −6).
+It shows the middle example contributing nothing to the weight, since its x is 0 — that's problem2.md's question 1 and its stated goal
+about shared parameters, in one picture.
+6. Your line-37 question, answered. At rate 0.9 the weight wobbles and the bias doesn't because the weight's gradient is scaled by mean(x²) = 2
+and the bias's by 1. So each step moves the weight 0.9 × 2 = 1.8 of the way to the bottom — past 1, so it overshoots and lands on the far side
+while the bias moves 0.9 and just settles. (Past 2.0 the weight would diverge.) 
 """
 
 from __future__ import annotations
