@@ -44,7 +44,7 @@ def train(
     *,
     initial_weight: float = 0.0,
     initial_bias: float = 0.0,
-    learning_rate: float = 0.6,
+    learning_rate: float = 0.1,
     steps: int = 20,
 ) -> tuple[float, float, list[RegressionStep]]:
     # TODO: repeat gradient descent updates.

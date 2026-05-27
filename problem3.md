@@ -29,7 +29,7 @@ probability >= 0.5   ->  prediction    0 or 1                the decision
 
 Stage 2 stopped at the first line and called it the answer.  Classification keeps
 going.  Note where each function below operates: the loss and the gradient both
-live at the **logit** level and never touch probabilities.  Part D explains why.
+live at the **logit** level and never touch probabilities.  Part F explains why.
 
 Generate two labeled clusters in two dimensions:
 
@@ -102,10 +102,152 @@ The direct and stable versions must agree to floating-point precision on ordinar
 inputs such as `[-500, -8, 0, 8, 500]`.  The stable version must additionally
 produce no overflow warning at `+/-1000`.
 
-### Part C: why cross-entropy and not squared error
+### Part C: where the name "cross-entropy" comes from
 
-You already have a loss that works on numbers: `0.5 * (p - y)**2`.  Before
-reaching for it again, test what it does to *learning*, not just to the score.
+The formula in Part F looks arbitrary until you build it from one idea, so build
+it.  Everything below is about *measuring a probabilistic prediction*; none of it
+is specific to neural networks.
+
+Start with a single outcome and how surprised you are to see it.  Your model
+assigned it probability `q`.  Define:
+
+```text
+surprise(outcome) = -log q(outcome)
+```
+
+Check that it behaves the way surprise should.  An outcome you called certain
+(`q = 1`) has surprise `0` — you learned nothing.  An outcome you called
+impossible (`q -> 0`) has surprise `-> infinity`.  And for two independent
+events, probabilities multiply while surprise adds:
+
+```text
+-log(q1 * q2) = -log q1 + -log q2
+```
+
+Those three requirements are not merely satisfied by `-log q`; they pin it down.
+Any function that is zero at `q = 1` and turns products into sums must be a
+multiple of the logarithm, and the multiple is only a choice of unit.  Use
+`log2` and the unit is *bits*; use natural log and the unit is *nats*.  This
+course uses nats throughout, so remember that `log(2) = 0.6931` nats is exactly
+one bit.
+
+Now average the surprise over many outcomes.  Two distributions can appear, and
+keeping them apart is the whole point:
+
+```text
+p   the distribution outcomes are really drawn from   (reality)
+q   the distribution your model predicts              (your model)
+```
+
+If your model happens to be exactly right, so that `q = p`, the average surprise
+is
+
+```text
+H(p) = -sum_x p(x) log p(x)              <- entropy
+```
+
+That is Shannon's entropy: the irreducible average surprise of the source.  You
+cannot do better, no matter how good your model is, because the randomness is in
+the world and not in you.
+
+If your model is *wrong*, reality still decides which outcomes occur and how
+often — that is `p` — but you get charged `-log q(x)` for each one, because `q`
+is what you predicted.  The average is
+
+```text
+H(p, q) = -sum_x p(x) log q(x)           <- cross-entropy
+```
+
+Two different distributions in one expression, each playing a different role:
+`p` picks the outcomes, `q` sets the price.  That crossing is the name.  Read it
+out loud as "the average surprise of reality, scored by my model."
+
+Now the fact that makes it a loss function.  Cross-entropy is never smaller than
+entropy, and equals it only when `q = p`.  The gap has a name:
+
+```text
+H(p, q) = H(p) + KL(p || q)
+          ^^^^   ^^^^^^^^^^
+          fixed  your error, >= 0, zero only if q == p
+```
+
+`H(p)` does not depend on your parameters at all, so minimizing cross-entropy is
+*exactly* minimizing `KL(p || q)` — pushing your predicted distribution onto the
+true one.  That is the justification, in one line.  You are not minimizing an
+arbitrary distance; you are minimizing the excess surprise your model causes.
+
+### Part D: from that definition down to our two-term formula
+
+Apply the definition to supervised learning.  We never see the true `p`; we see a
+label.  Treat the label as a distribution that puts all its mass on the observed
+class:
+
+```text
+label y = 1  ->  p = [0, 1]        p(class 0) = 0,     p(class 1) = 1
+label y = 0  ->  p = [1, 0]
+in general    p = [1 - y, y]
+```
+
+The model's distribution is `q = [1 - p_hat, p_hat]` where `p_hat = sigmoid(z)`.
+Substitute both into `H(p, q) = -sum_x p(x) log q(x)`:
+
+```text
+H(p, q) = -(1 - y) * log(1 - p_hat) - y * log(p_hat)
+```
+
+That is Part F's formula, derived rather than asserted.  Confirm two things
+before moving on:
+
+- The sum over classes collapsed to a single surviving term, because `p` is zero
+  on every class but the true one.  With hard labels, cross-entropy always
+  reduces to `-log(probability the model gave the correct answer)`.  Say that
+  sentence back without looking; it is the whole loss.
+- `H(p) = 0` for a one-hot `p` — a certain outcome carries no surprise.  So here
+  the cross-entropy *is* the KL divergence, with nothing else mixed in.  The
+  number you print during training is pure model error.
+
+Now forget information theory entirely and ask a statistician's question: which
+parameters make the labels we actually observed most probable?  The likelihood of
+the whole dataset is
+
+```text
+prod_i  p_hat_i**y_i  *  (1 - p_hat_i)**(1 - y_i)
+```
+
+Take the negative log, divide by `N`, and you have the mean binary cross-entropy
+again.  Minimizing cross-entropy *is* maximum likelihood estimation.  Information
+theory and statistics arrive at one formula by different routes, which is the
+strongest evidence you will get that the formula is not a design choice.
+
+One notation warning before you continue.  In the two sections above, `p` is
+*reality* and `q` is *your model* — that is the standard convention in
+information theory, and every textbook you read will use it.  In the rest of this
+stage, and in almost all neural-network code, `p` instead means the model's own
+probability `sigmoid(z)`, and the label is `y`.  The letters are reused and the
+meanings do not carry over.  So when you read `dloss/dlogit = p - y` below, that
+`p` is the `p_hat` from this section.
+
+Because the units are real, the loss is readable.  Learn these three landmarks:
+
+```text
+0.6931 nats = log(2)    one bit    a two-class model guessing 0.5      (Stage 3)
+2.3026 nats = log(10)              a ten-class model guessing 0.1      (Stage 4)
+0.05   nats                        a model that is almost never surprised
+```
+
+You will meet `0.6931` again as the step-0 loss in Part H.  When you do, you
+should already know why: zero parameters give logit `0`, sigmoid gives `0.5`, and
+one bit of uncertainty per example is precisely a coin flip.  A squared error of
+`0.25` tells you nothing comparable.
+
+### Part E: why cross-entropy and not squared error
+
+You already have a loss that works on numbers: `0.5 * (p - y)**2`.  Everything
+above argued that cross-entropy is *meaningful*; it did not yet argue that
+squared error is unusable.  In fact squared error on probabilities is a perfectly
+honest score — like cross-entropy, it is minimized only when the predicted
+probability equals the true one, so it will not reward a dishonest model.  The
+problem is not what it measures.  It is what it does to *learning*.
 
 For a sigmoid neuron the derivative of the loss with respect to the logit is:
 
@@ -119,9 +261,14 @@ logit `-20` — and compare the magnitudes.  Then answer in one sentence: what d
 squared error do when the model is maximally wrong, and why is that the opposite
 of what you want?
 
+The extra `p * (1 - p)` is the sigmoid's own derivative, and it goes to zero at
+both ends.  Squared error keeps it; cross-entropy's `log` produces exactly its
+reciprocal and cancels it, which is what Part G shows.  So the choice of loss is
+what decides whether a saturated neuron can still learn.
+
 This is the reason classification uses cross-entropy.  It is not a convention.
 
-### Part D: a stable loss, computed from logits
+### Part F: a stable loss, computed from logits
 
 Binary cross-entropy for one example is:
 
@@ -182,7 +329,7 @@ Note also how the loss for a confidently wrong prediction grows as the logit
 grows.  Is that growth linear or exponential?  Why does the answer matter for
 keeping training stable?
 
-### Part E: backward propagation
+### Part G: backward propagation
 
 Sigmoid's derivative is `p * (1 - p)`, and the log in cross-entropy contributes
 `1 / (p * (1 - p))`.  Multiply them and everything cancels:
@@ -217,7 +364,7 @@ most useful debugging check in this course.
 Finally, write `X.T @ dloss/dlogits` out as an explicit sum over examples and
 confirm it is the Stage 2 gradient generalized to more than one feature.
 
-### Part F: train and classify
+### Part H: train and classify
 
 Start weights and bias at zero.  Repeat full-batch gradient descent.  Predict:
 
@@ -264,6 +411,13 @@ The loss will never reach zero.  Explain what the model is still improving.
 6. Why is the initial loss `log(2)` rather than some other number?
 7. Zero initialization works here.  Predict whether it will still work once a
    hidden layer of several neurons is added in Stage 9, and say why.
+8. Cross-entropy and KL divergence differ by `H(p)`.  Why does that difference
+   change nothing about which parameters gradient descent finds?
+9. The definition of cross-entropy sums over every class.  Why does that sum
+   leave only one term standing here, and what would have to be true of the
+   labels for the other term to survive?
+10. In what units is your loss measured, and what would a loss of `0.10` mean
+    stated in those units?
 
 ### Stretch
 
