@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from solution1_viz import show_training_report
+
 # For record keeping only.
 @dataclass(frozen=True)
 class ScalarStep:
@@ -56,3 +58,8 @@ print(learnedWeight)
 print("step | weight     | prediction | loss       | gradient")
 for item in steps:
     print(f"{item.step:>4} | {item.weight:>10.6f} | {item.prediction:>10.6f} | {item.loss:>10.6f} | {item.gradient:>10.6f}")
+
+# The same run as a picture.  All of the matplotlib code lives in
+# solution1_viz.py; it only needs the four functions above.
+figure_path = show_training_report(3, 12, forward, half_squared_error, backward, train_weight)
+print(f"\nSaved the training graphs to {figure_path}")
